@@ -84,9 +84,13 @@ namespace MailDemo
 
                 Console.WriteLine($"Number of messages: {inbox.Count}");
 
-                // Iterate through messages (e.g. only the first message for the example)
-                for (int i = inbox.Count - 1; i > inbox.Count - 11; i--)
+                // Iterate through messages
+                int readIndex = 0;
+                for (int i = inbox.Count - 1; i > inbox.Count - 3; i--)
                 {
+                    readIndex++;
+                    if (readIndex > 5) break;
+
                     var message = inbox.GetMessage(i);
                     Console.WriteLine($"Message from: {message.From}");
                     Console.WriteLine($"Subject: {message.Subject}");
@@ -94,47 +98,43 @@ namespace MailDemo
                     Console.WriteLine($"Text: {message.TextBody}");
                     Console.WriteLine("----------------------");
 
-                    // Save attachments
-                    if (message.Attachments.Any())
-                        foreach (var attachment in message.Attachments)
+                    // Save the attachments of the message
+                    foreach (var attachment in message.Attachments)
+                    {
+                        if (attachment is MimePart part)
                         {
-                            if (attachment is MimePart part)
-                            {
-                                var fileName = part.FileName;
+                            string fileName = part.FileName;
 
-                                // Make sure the directory exists
+                            // Create the file path
+                            string filePath = Path.Combine(SaveDirectory, fileName);
+
+                            // Ensure directory exists
+                            if (!Directory.Exists(SaveDirectory))
                                 Directory.CreateDirectory(SaveDirectory);
 
-                                var filePath = Path.Combine(SaveDirectory, fileName);
-                                Console.WriteLine($"filepath: {filePath}");
-
-                                // Save file
-                                using (var stream = File.Create(filePath))
-                                {
-                                    part.Content.DecodeTo(stream);
-                                }
-
-                                Console.WriteLine($"Attachment saved: {filePath}");
-                            }
+                            // Save the attachment to the file
+                            using FileStream stream = File.Create(filePath);
+                            part.Content.DecodeTo(stream);
+                            Console.WriteLine($"Attachment saved to: {filePath}");
                         }
+                    }
 
+                    // Open the inbox
+                    inbox.Open(FolderAccess.ReadWrite);
 
-                    //// Move messages
-                    //IMailFolder root = client.GetFolder(client.PersonalNamespaces[0]);
-                    //IMailFolder? destinationFolder = client.GetFolder("INBOX/Messages");
+                    // Ensure the "MESSAGES" folder exists or create it
+                    var messagesFolder = client.GetFolder(client.PersonalNamespaces[0]).GetSubfolder("MESSAGES");
+                    if (messagesFolder == null)
+                    {
+                        messagesFolder = client.GetFolder(client.PersonalNamespaces[0]).Create("MESSAGES", true);
+                        Console.WriteLine($"Created folder: {"MESSAGES"}");
+                    }
+                    //messagesFolder.Open(FolderAccess.ReadWrite);
 
-                    //// If the folder does not exist yet, you can create it:
-                    //if (destinationFolder == null)
-                    //{
-                    //    destinationFolder = root.Create("INBOX/Messages", true);
-                    //}
+                    // Move message
+                    inbox.MoveTo(i, messagesFolder);
 
-                    //destinationFolder.Open(FolderAccess.ReadWrite);
-
-                    //// Move message
-                    //inbox.MoveTo(i, destinationFolder);
-
-                    //Console.WriteLine("Message has been moved to the 'Messages' folder.");
+                    Console.WriteLine("Message has been moved to the 'MESSAGES' folder.");
                 }
 
                 // Disconnect
